@@ -40,13 +40,7 @@ class DefaultPendingDependenciesHandler implements PendingDependenciesHandler {
             boolean isOptionalDependency = dependencyState.getDependency().isPending();
             if (!isOptionalDependency) {
                 // Mark as not pending. If we saw pending dependencies before, mark them as no longer pending
-                PendingDependencies priorPendingDependencies = pendingDependencies.notPending(key);
-                if (priorPendingDependencies != null && priorPendingDependencies.isPending()) {
-                    if (noLongerPending == null) {
-                        noLongerPending = Lists.newLinkedList();
-                    }
-                    noLongerPending.add(priorPendingDependencies);
-                }
+                markNotPending(key);
                 return false;
             }
 
@@ -62,6 +56,16 @@ class DefaultPendingDependenciesHandler implements PendingDependenciesHandler {
             // No hard dependency, queue up pending dependency in case we see a hard dependency later.
             pendingDependencies.addNode(node);
             return true;
+        }
+
+        public void markNotPending(ModuleIdentifier key) {
+            PendingDependencies priorPendingDependencies = pendingDependencies.notPending(key);
+            if (priorPendingDependencies != null && priorPendingDependencies.isPending()) {
+                if (noLongerPending == null) {
+                    noLongerPending = Lists.newLinkedList();
+                }
+                noLongerPending.add(priorPendingDependencies);
+            }
         }
 
         public void complete() {

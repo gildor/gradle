@@ -216,7 +216,7 @@ class NodeState implements DependencyGraphNode {
         }
 
         visitDependencies(resolutionFilter, pendingDependenciesHandler, discoveredEdges);
-        visitOwners(discoveredEdges);
+        visitOwners(discoveredEdges, pendingDependenciesHandler);
     }
 
     /**
@@ -252,10 +252,12 @@ class NodeState implements DependencyGraphNode {
      * If a component declares that it belongs to a platform, we add an edge to the platform.
      *
      * @param discoveredEdges the collection of edges for this component
+     * @param pendingDependenciesHandler the pending dependencies handler
      */
-    private void visitOwners(Collection<EdgeState> discoveredEdges) {
+    private void visitOwners(Collection<EdgeState> discoveredEdges, PendingDependenciesHandler pendingDependenciesHandler) {
         ImmutableList<? extends ComponentIdentifier> owners = component.getMetadata().getPlatformOwners();
         if (!owners.isEmpty()) {
+            PendingDependenciesHandler.Visitor visitor = pendingDependenciesHandler.start();
             for (ComponentIdentifier owner : owners) {
                 if (owner instanceof ModuleComponentIdentifier) {
                     ModuleComponentIdentifier platformId = (ModuleComponentIdentifier) owner;
@@ -265,8 +267,10 @@ class NodeState implements DependencyGraphNode {
                     // 1. the "platform" referenced is a real module, in which case we directly add it to the graph
                     // 2. the "platform" is a virtual, constructed thing, in which case we add virtual edges to the graph
                     addPlatformEdges(discoveredEdges, platformId, cs);
+                    visitor.markNotPending(platformId.getModuleIdentifier());
                 }
             }
+            visitor.complete();
         }
     }
 
