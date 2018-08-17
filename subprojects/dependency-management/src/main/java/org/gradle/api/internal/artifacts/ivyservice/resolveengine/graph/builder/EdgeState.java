@@ -155,6 +155,7 @@ class EdgeState implements DependencyGraphEdge {
         targetNodeSelectionFailure = null;
         ComponentResolveMetadata targetModuleVersion = targetComponent.getMetadata();
         if (targetModuleVersion == null) {
+            targetComponent.getModule().getPlatformState().addOrphanEdge(this);
             // Broken version
             return;
         }
