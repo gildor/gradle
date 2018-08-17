@@ -28,7 +28,9 @@ class DefaultNamedDomainObjectListTest extends AbstractNamedDomainObjectCollecti
     }
     final DefaultNamedDomainObjectList<CharSequence> list = new DefaultNamedDomainObjectList<CharSequence>(CharSequence, DirectInstantiator.INSTANCE, toStringNamer)
 
-    final DefaultNamedDomainObjectList<String> container = list
+    final DefaultNamedDomainObjectList<String> getContainer() {
+        return list
+    }
     final String a = "a"
     final String b = "b"
     final String c = "c"
@@ -459,5 +461,136 @@ class DefaultNamedDomainObjectListTest extends AbstractNamedDomainObjectCollecti
         iter.nextIndex() == 1
         iter.next() == "c"
         !iter.hasNext()
+    }
+
+    class InsertActionFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.add(0, b)
+        }
+    }
+
+    class InsertClosureFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.add(0, b)
+        }
+    }
+
+    class InsertAllActionFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.addAll(0, [b])
+        }
+    }
+
+    class InsertAllClosureFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.addAll(0, [b])
+        }
+    }
+
+    class SetActionFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.set(0, b)
+        }
+    }
+
+    class SetClosureFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.set(0, b)
+        }
+    }
+
+    class RemoveWithIndexActionFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.remove(0)
+        }
+    }
+
+    class RemoveWithIndexClosureFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.remove(0)
+        }
+    }
+
+    class AddOnListIteratorActionFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            def iter = container.listIterator()
+            iter.next()
+            iter.add(b)
+        }
+    }
+
+    class AddOnListIteratorClosureFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            def iter = container.listIterator()
+            iter.next()
+            iter.add(b)
+        }
+    }
+
+    class SetOnListIteratorActionFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            def iter = container.listIterator()
+            iter.next()
+            iter.set(b)
+        }
+    }
+
+    class SetOnListIteratorClosureFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            def iter = container.listIterator()
+            iter.next()
+            iter.set(b)
+        }
+    }
+
+    class RemoveOnListIteratorActionFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            def iter = container.listIterator()
+            iter.next()
+            iter.remove()
+        }
+    }
+
+    class RemoveOnListIteratorClosureFactory extends AbstractDomainObjectCollectionSpec.AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            def iter = container.listIterator()
+            iter.next()
+            iter.remove()
+        }
+    }
+
+    @Override
+    protected def getInvalidCallFromLazyConfiguration() {
+        def result = []
+        result.addAll(super.getInvalidCallFromLazyConfiguration())
+        result.add(["add(int, T)"            , InsertActionFactory])
+        result.add(["add(int, T)"            , InsertClosureFactory])
+        result.add(["addAll(int, Collection)", InsertAllActionFactory])
+        result.add(["addAll(int, Collection)", InsertAllClosureFactory])
+        result.add(["set(int, T)"            , SetActionFactory])
+        result.add(["set(int, T)"            , SetClosureFactory])
+        result.add(["remove(int)"            , RemoveWithIndexActionFactory])
+        result.add(["remove(int)"            , RemoveWithIndexClosureFactory])
+        result.add(["listIterator().add(T)"  , AddOnListIteratorActionFactory])
+        result.add(["listIterator().add(T)"  , AddOnListIteratorClosureFactory])
+        result.add(["listIterator().set(T)"  , SetOnListIteratorActionFactory])
+        result.add(["listIterator().set(T)"  , SetOnListIteratorClosureFactory])
+        result.add(["listIterator().remove()", RemoveOnListIteratorActionFactory])
+        result.add(["listIterator().remove()", RemoveOnListIteratorClosureFactory])
+        return result
     }
 }

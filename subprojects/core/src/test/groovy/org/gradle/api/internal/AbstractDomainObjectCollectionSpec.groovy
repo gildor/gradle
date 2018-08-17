@@ -18,10 +18,14 @@ package org.gradle.api.internal
 
 import org.gradle.api.Action
 import org.gradle.api.DomainObjectCollection
+import org.gradle.api.Transformer
 import org.gradle.api.internal.provider.CollectionProviderInternal
 import org.gradle.api.internal.provider.ProviderInternal
+import org.gradle.api.internal.provider.Providers
+import org.gradle.internal.Factory
 import org.junit.Assume
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import static org.gradle.util.WrapUtil.toList
 
@@ -1295,21 +1299,6 @@ abstract class AbstractDomainObjectCollectionSpec<T> extends Specification {
         result == iterationOrder(a)
     }
 
-    def "can mutate the container inside a configureEach action"() {
-        given:
-        container.add(a)
-        container.add(b)
-        container.add(c)
-
-        when:
-        container.configureEach {
-            container.add(d)
-        }
-
-        then:
-        toList(container) == [a, b, c, d]
-    }
-
     def "provider of iterable is queried but elements not configured when lazy action is registered on non-matching filter"() {
         containerAllowsExternalProviders()
         def action = Mock(Action)
@@ -1430,5 +1419,340 @@ abstract class AbstractDomainObjectCollectionSpec<T> extends Specification {
         and:
         1 * action.execute(a)
         0 * action.execute(_)
+    }
+
+    abstract static class AbstractConfigurationFactory<T> implements Factory<T> {
+        private boolean isAlreadyCalled = false
+
+        void callNoReentrant() {
+            if (!isAlreadyCalled) {
+                isAlreadyCalled = true
+                call()
+            }
+        }
+
+        abstract void call()
+    }
+
+    abstract static class AbstractConfigurationActionFactory<T> extends AbstractConfigurationFactory<Action<T>> {
+        static String getConfigurationType() {
+            return Action.simpleName
+        }
+
+        @Override
+        Action<T> create() {
+            return new Action<T>() {
+                @Override
+                void execute(T t) {
+                    AbstractConfigurationActionFactory.this.callNoReentrant()
+                }
+            }
+        }
+    }
+
+    abstract static class AbstractConfigurationClosureFactory extends AbstractConfigurationFactory<Closure> {
+        static String getConfigurationType() {
+            return Closure.simpleName
+        }
+
+        @Override
+        Closure create() {
+            return { AbstractConfigurationClosureFactory.this.callNoReentrant() }
+        }
+    }
+
+    class AddActionFactory extends AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.add(b)
+        }
+    }
+
+    class AddClosureFactory extends AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.add(b)
+        }
+    }
+
+    class AddLaterActionFactory extends AbstractConfigurationActionFactory {
+        AddLaterActionFactory() {
+            containerAllowsExternalProviders()
+        }
+
+        @Override
+        void call() {
+            container.addLater(Providers.of(b))
+        }
+    }
+
+    class AddLaterClosureFactory extends AbstractConfigurationClosureFactory {
+        AddLaterClosureFactory() {
+            containerAllowsExternalProviders()
+        }
+
+        @Override
+        void call() {
+            container.addLater(Providers.of(b))
+        }
+    }
+
+    class AddAllLaterActionFactory<T> extends AbstractConfigurationActionFactory<T> {
+        AddAllLaterActionFactory() {
+            containerAllowsExternalProviders()
+        }
+
+        @Override
+        void call() {
+            container.addAllLater(new CollectionProviderInternal<T, Collection<T>>() {
+                @Override
+                Class getElementType() {
+                    return type
+                }
+
+                @Override
+                int size() {
+                    return 1
+                }
+
+                @Override
+                Class getType() {
+                    return List
+                }
+
+                @Override
+                ProviderInternal<T> map(Transformer transformer) {
+                    throw new UnsupportedOperationException()
+                }
+
+                @Override
+                Collection<T> get() {
+                    return [b]
+                }
+
+                @Override
+                Collection<T> getOrNull() {
+                    return get()
+                }
+
+                @Override
+                Collection<T> getOrElse(Collection<T> defaultValue) {
+                    return get()
+                }
+
+                @Override
+                boolean isPresent() {
+                    return true
+                }
+            })
+        }
+    }
+
+    class AddAllLaterClosureFactory<T> extends AbstractConfigurationClosureFactory {
+        AddAllLaterClosureFactory() {
+            containerAllowsExternalProviders()
+        }
+
+        @Override
+        void call() {
+            container.addAllLater(new CollectionProviderInternal<T, Collection<T>>() {
+                @Override
+                Class getElementType() {
+                    return type
+                }
+
+                @Override
+                int size() {
+                    return 1
+                }
+
+                @Override
+                Class getType() {
+                    return List
+                }
+
+                @Override
+                ProviderInternal<T> map(Transformer transformer) {
+                    throw new UnsupportedOperationException()
+                }
+
+                @Override
+                Collection<T> get() {
+                    return [b]
+                }
+
+                @Override
+                Collection<T> getOrNull() {
+                    return get()
+                }
+
+                @Override
+                Collection<T> getOrElse(Collection<T> defaultValue) {
+                    return get()
+                }
+
+                @Override
+                boolean isPresent() {
+                    return true
+                }
+            })
+        }
+    }
+
+    class AddAllActionFactory extends AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.addAll([b])
+        }
+    }
+
+    class AddAllClosureFactory extends AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.addAll([b])
+        }
+    }
+
+    class ClearActionFactory extends AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.clear()
+        }
+    }
+
+    class ClearClosureFactory extends AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.clear()
+        }
+    }
+
+    class RemoveActionFactory extends AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.remove(b)
+        }
+    }
+
+    class RemoveClosureFactory extends AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.remove(b)
+        }
+    }
+
+    class RemoveAllActionFactory extends AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.removeAll([b])
+        }
+    }
+
+    class RemoveAllClosureFactory extends AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.removeAll([b])
+        }
+    }
+
+    class RetainAllActionFactory extends AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            container.retainAll([b])
+        }
+    }
+
+    class RetainAllClosureFactory extends AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            container.retainAll([b])
+        }
+    }
+
+    class RemoveOnIteratorActionFactory extends AbstractConfigurationActionFactory {
+        @Override
+        void call() {
+            def iter = container.iterator()
+            iter.next()
+            iter.remove()
+        }
+    }
+
+    class RemoveOnIteratorClosureFactory extends AbstractConfigurationClosureFactory {
+        @Override
+        void call() {
+            def iter = container.iterator()
+            iter.next()
+            iter.remove()
+        }
+    }
+
+    protected def getInvalidCallFromLazyConfiguration() {
+        return [
+            ["add(T)"               , AddActionFactory],
+            ["add(T)"               , AddClosureFactory],
+            ["addLater(Provider)"   , AddLaterActionFactory],
+            ["addLater(Provider)"   , AddLaterClosureFactory],
+            ["addAllLater(Provider)", AddAllLaterActionFactory],
+            ["addAllLater(Provider)", AddAllLaterClosureFactory],
+            ["addAll(Collection)"   , AddAllActionFactory],
+            ["addAll(Collection)"   , AddAllClosureFactory],
+            ["clear()"              , ClearActionFactory],
+            ["clear()"              , ClearClosureFactory],
+            ["remove(Object)"       , RemoveActionFactory],
+            ["remove(Object)"       , RemoveClosureFactory],
+            ["removeAll(Collection)", RemoveAllActionFactory],
+            ["removeAll(Collection)", RemoveAllClosureFactory],
+            ["retainAll(Collection)", RetainAllActionFactory],
+            ["retainAll(Collection)", RetainAllClosureFactory],
+            ["iterator().remove()"  , RemoveOnIteratorActionFactory],
+            ["iterator().remove()"  , RemoveOnIteratorClosureFactory],
+        ]
+    }
+
+    @Unroll
+    def "disallow mutating when configureEach(#factoryClass.configurationType) calls #description"() {
+        def factory = factoryClass.newInstance(this)
+
+        when:
+        container.configureEach(factory.create())
+        container.add(a)
+
+        then:
+        def ex = thrown(IllegalStateException)
+        ex.message == "${container.class.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
+
+        where:
+        [description, factoryClass] << getInvalidCallFromLazyConfiguration()
+    }
+
+    @Unroll
+    def "allow mutating when all(#factoryClass.configurationType) calls #description"() {
+        def factory = factoryClass.newInstance(this)
+
+        when:
+        container.all(factory.create())
+        container.add(a)
+
+        then:
+        noExceptionThrown()
+
+        where:
+        [description, factoryClass] << getInvalidCallFromLazyConfiguration()
+    }
+
+    @Unroll
+    def "allow mutating when withType(Class, #factoryClass.configurationType) calls #description"() {
+        def factory = factoryClass.newInstance(this)
+
+        when:
+        container.withType(type, factory.create())
+        container.add(a)
+
+        then:
+        noExceptionThrown()
+
+        where:
+        [description, factoryClass] << getInvalidCallFromLazyConfiguration()
     }
 }

@@ -16,5 +16,70 @@
 
 package org.gradle.api.internal
 
+import org.gradle.api.Named
+import org.gradle.api.NamedDomainObjectCollection
+import org.gradle.api.internal.provider.ProviderInternal
+import spock.lang.Unroll
+
 abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomainObjectCollectionSpec<T> {
+    abstract NamedDomainObjectCollection<T> getContainer()
+
+    @Unroll
+    def "allow mutating when getByName(String, #factoryClass.configurationType) calls #description"() {
+        def factory = factoryClass.newInstance(this)
+
+        when:
+        container.add(a)
+        container.getByName("a", factory.create())
+
+        then:
+        noExceptionThrown()
+
+        where:
+        [description, factoryClass] << getInvalidCallFromLazyConfiguration()
+    }
+
+    @Unroll
+    def "disallow mutating when named(String).configure(#factoryClass.configurationType) for added element calls #description"() {
+        def factory = factoryClass.newInstance(this)
+
+        when:
+        container.add(a)
+        container.named("a").configure(factory.create())
+
+        then:
+        def ex = thrown(IllegalStateException)
+        ex.message == "${container.class.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
+
+        where:
+        [description, factoryClass] << getInvalidCallFromLazyConfiguration()
+    }
+
+    @Unroll
+    def "disallow mutating when named(String).configure(#factoryClass.configurationType) for added element provider calls #description"() {
+        containerAllowsExternalProviders()
+        def factory = factoryClass.newInstance(this)
+        def provider = Mock(NamedProviderInternal)
+
+        given:
+        _ * provider.type >> type
+        _ * provider.name >> "a"
+        _ * provider.get() >> a
+
+        when:
+        container.addLater(provider)
+        def domainObjectProvider = container.named("a")
+        domainObjectProvider.configure(factory.create())
+        domainObjectProvider.get() // force realize
+
+        then:
+        def ex = thrown(IllegalStateException)
+        ex.message == "Could not create domain object 'a' (${type.simpleName})"
+        ex.cause.message == "${container.class.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
+
+        where:
+        [description, factoryClass] << getInvalidCallFromLazyConfiguration()
+    }
+
+    interface NamedProviderInternal extends Named, ProviderInternal {}
 }
