@@ -81,5 +81,25 @@ abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomain
         [description, factoryClass] << getInvalidCallFromLazyConfiguration()
     }
 
+    def "can reference external provider by name without realizing them"() {
+        containerAllowsExternalProviders()
+        def provider = Mock(NamedProviderInternal)
+
+        given:
+        _ * provider.type >> type
+        _ * provider.name >> "a"
+        _ * provider.get() >> a
+        container.addLater(provider)
+
+        when:
+        def domainObjectProvider = container.named("a")
+
+        then:
+        domainObjectProvider.name == "a"
+        domainObjectProvider.present
+        domainObjectProvider.get() == a
+        domainObjectProvider.type == type
+    }
+
     interface NamedProviderInternal extends Named, ProviderInternal {}
 }
