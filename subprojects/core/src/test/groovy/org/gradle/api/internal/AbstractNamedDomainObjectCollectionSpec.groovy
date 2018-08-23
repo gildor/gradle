@@ -21,16 +21,21 @@ import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.internal.provider.ProviderInternal
 import spock.lang.Unroll
 
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.*
+
 abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomainObjectCollectionSpec<T> {
     abstract NamedDomainObjectCollection<T> getContainer()
 
     @Unroll
-    def "allow mutating when getByName(String, #factoryClass.configurationType) calls #description"() {
-        def factory = factoryClass.newInstance(this)
+    def "allow mutating when getByName(String, #factoryClass.configurationType.simpleName) calls #description"() {
+        def factory = factoryClass.newInstance()
+        if (factory.isUseExternalProviders()) {
+            containerAllowsExternalProviders()
+        }
 
         when:
         container.add(a)
-        container.getByName("a", factory.create())
+        container.getByName("a", factory.create(container, b))
 
         then:
         noExceptionThrown()
@@ -40,12 +45,15 @@ abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomain
     }
 
     @Unroll
-    def "disallow mutating when named(String).configure(#factoryClass.configurationType) for added element calls #description"() {
-        def factory = factoryClass.newInstance(this)
+    def "disallow mutating when named(String).configure(#factoryClass.configurationType.simpleName) for added element calls #description"() {
+        def factory = factoryClass.newInstance()
+        if (factory.isUseExternalProviders()) {
+            containerAllowsExternalProviders()
+        }
 
         when:
         container.add(a)
-        container.named("a").configure(factory.create())
+        container.named("a").configure(factory.create(container, b))
 
         then:
         def ex = thrown(IllegalStateException)
@@ -56,9 +64,12 @@ abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomain
     }
 
     @Unroll
-    def "disallow mutating when named(String).configure(#factoryClass.configurationType) for added element provider calls #description"() {
+    def "disallow mutating when named(String).configure(#factoryClass.configurationType.simpleName) for added element provider calls #description"() {
         containerAllowsExternalProviders()
-        def factory = factoryClass.newInstance(this)
+        def factory = factoryClass.newInstance()
+        if (factory.isUseExternalProviders()) {
+            containerAllowsExternalProviders()
+        }
         def provider = Mock(NamedProviderInternal)
 
         given:
@@ -69,7 +80,7 @@ abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomain
         when:
         container.addLater(provider)
         def domainObjectProvider = container.named("a")
-        domainObjectProvider.configure(factory.create())
+        domainObjectProvider.configure(factory.create(container, b))
         domainObjectProvider.get() // force realize
 
         then:
