@@ -21,6 +21,7 @@ import org.gradle.integtests.fixtures.daemon.DaemonClientFixture
 import org.gradle.integtests.fixtures.daemon.DaemonIntegrationSpec
 import org.gradle.internal.jvm.Jvm
 import org.gradle.test.fixtures.ConcurrentTestUtil
+import org.gradle.util.TextUtil
 import spock.lang.Unroll
 
 class ExecCancellationIntegrationTest extends DaemonIntegrationSpec implements DirectoryBuildCacheFixture {
@@ -146,14 +147,33 @@ class ExecCancellationIntegrationTest extends DaemonIntegrationSpec implements D
         file.absolutePath.replace('\\', '/')
     }
 
+    File getShutdownFile() {
+        file("shutdown.txt")
+
+    }
+
     void blockCode() {
         file('src/main/java/Block.java') << """ 
-            import java.util.concurrent.CountDownLatch;
-
+            import java.io.*;
+            import java.util.concurrent.*;
+            
             public class Block {
-                public static void main(String[] args) throws InterruptedException {
+                public static void main(String[] args) throws Exception {
                     System.out.println("$START_UP_MESSAGE");
+                    Runtime.getRuntime().addShutdownHook(new Thread(new GradleShutdownHook()));
                     new CountDownLatch(1).await();
+                }
+                
+                private static class GradleShutdownHook implements Runnable {
+                    public void run() {
+                        try {
+                            File result = new File("${TextUtil.escapeString(shutdownFile)}");
+                            PrintStream stream = new PrintStream(new FileOutputStream(result));
+                            stream.print("Done");
+                            stream.close();
+                        } catch (Exception e) {
+                        }
+                    }
                 }
             }
         """
@@ -173,6 +193,7 @@ class ExecCancellationIntegrationTest extends DaemonIntegrationSpec implements D
     private void cancelBuild(String task) {
         client.kill()
         waitForDaemonLog("Build operation 'Task :$task' completed")
+        assert shutdownFile.text == "Done"
         assert !client.gradleHandle.standardOutput.contains("BUILD FAIL")
         assert !client.gradleHandle.standardOutput.contains("BUILD SUCCESS")
         daemons.daemon.becomesIdle()
