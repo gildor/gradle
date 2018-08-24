@@ -16,8 +16,6 @@
 
 package org.gradle.testing
 
-import groovy.util.slurpersupport.GPathResult
-import groovy.util.slurpersupport.NodeChildren
 import org.gradle.api.internal.tasks.testing.DecoratingTestDescriptor
 import org.gradle.api.internal.tasks.testing.DefaultTestClassDescriptor
 import org.gradle.api.internal.tasks.testing.DefaultTestMethodDescriptor
@@ -32,6 +30,10 @@ import org.gradle.api.tasks.testing.TestResult
 import org.gradle.internal.event.ListenerBroadcast
 
 import javax.xml.datatype.DatatypeFactory
+import org.jetbrains.teamcity.rest.Build
+import org.openmbee.junit.model.JUnitTestSuite
+import org.openmbee.junit.model.JUnitFailure
+import groovy.transform.CompileStatic
 
 /**
  * This class is responsible for publishing events to {@link TestListener} and {@link TestOutputListener}
@@ -41,51 +43,48 @@ import javax.xml.datatype.DatatypeFactory
  * {@link JUnitXmlTestEventsGenerator#addTestOutputListener(org.gradle.api.tasks.testing.TestOutputListener)}
  * in order to avoid problems with resources closed by the "actual" test execution (in particular {@code outputWriter}).
  */
+@CompileStatic
 class JUnitXmlTestEventsGenerator {
     private final ListenerBroadcast<TestListener> testListenerBroadcast
     private final ListenerBroadcast<TestOutputListener> testOutputListenerBroadcast
-    CoordinatorBuild coordinatorBuild
+    Build coordinatorBuild
 
     JUnitXmlTestEventsGenerator(ListenerBroadcast<TestListener> testListenerBroadcast, ListenerBroadcast<TestOutputListener> testOutputListenerListenerBroadcast) {
         this.testOutputListenerBroadcast = testOutputListenerListenerBroadcast
         this.testListenerBroadcast = testListenerBroadcast
     }
 
-    void processXmlFile(File resultsFile, Object build) {
-        processXml(new XmlSlurper().parse(resultsFile), build)
-    }
-
-    void processXml(GPathResult testResult, Object build) {
-        String suiteName = testResult.@name.text()
-        def testSuiteDescriptor = new DecoratingTestDescriptor(new DefaultTestClassDescriptor(0, suiteName), createWorkerSuite())
+    void processTestSuite(JUnitTestSuite testSuite, Build build) {
+        String suiteName = testSuite.name
+        DecoratingTestDescriptor testSuiteDescriptor = new DecoratingTestDescriptor(new DefaultTestClassDescriptor(0, suiteName), createWorkerSuite())
         testListener.beforeSuite(testSuiteDescriptor.parent.parent)
         testListener.beforeSuite(testSuiteDescriptor.parent)
         testListener.beforeSuite(testSuiteDescriptor)
-        String timestamp = testResult.@timestamp.text()
+        String timestamp = testSuite.timestamp
         long startTime = DatatypeFactory.newInstance().newXMLGregorianCalendar(timestamp).toGregorianCalendar().getTimeInMillis()
-        testResult.testcase.each { testCase ->
-            String testCaseClassName = testCase.@classname.text()
-            String testMethodName = testCase.@name.text()
-            def testCaseDescriptor = new DecoratingTestDescriptor(new DefaultTestMethodDescriptor(0, testCaseClassName, testMethodName), testSuiteDescriptor)
-            def skipped = testCase.skipped
-            def failure = testCase.failure
-            long endTime = startTime + (testCase.@time.toDouble() * 1000).round()
+        testSuite.testCases.each { testCase ->
+            String testCaseClassName = testCase.className
+            String testMethodName = testCase.name
+            DecoratingTestDescriptor testCaseDescriptor = new DecoratingTestDescriptor(new DefaultTestMethodDescriptor(0, testCaseClassName, testMethodName), testSuiteDescriptor)
+            String skipped = testCase.skipped?.toString()
+            List<JUnitFailure> failures = testCase.failures
+            long endTime = startTime + (testCase.time * 1000).round()
 
-            if (failure.size() > 0) {
+            if (failures && failures.size() > 0) {
                 testListener.beforeTest(testCaseDescriptor)
                 publishAdditionalMetadata(testCaseDescriptor, build)
                 try {
-                    String systemErr = testResult."system-err".text()
+                    String systemErr = testSuite.systemOut
                     if (systemErr) {
                         testOutputListener.onOutput(testCaseDescriptor, new DefaultTestOutputEvent(TestOutputEvent.Destination.StdErr, systemErr))
                     }
                 } catch (Exception e) {
                     e.printStackTrace()
                 }
-                String failureText = failure.text()
+                String failureText = failures.collect { it.message } .join('\n')
                 failureText = failureText.replace("java.lang.AssertionError: ", "")
-                testListener.afterTest(testCaseDescriptor, new DefaultTestResult(TestResult.ResultType.FAILURE, startTime, endTime, 1, 0, 1, [assertionError(failureText)]))
-            } else if (!(skipped.size() > 0)) {
+                testListener.afterTest(testCaseDescriptor, new DefaultTestResult(TestResult.ResultType.FAILURE, startTime, endTime, 1, 0, 1, [new AssertionError(failureText as Object)] as List<Throwable>))
+            } else if (skipped == '' || skipped == '0') {
                 testListener.beforeTest(testCaseDescriptor)
                 publishAdditionalMetadata(testCaseDescriptor, build)
                 testListener.afterTest(testCaseDescriptor, new DefaultTestResult(TestResult.ResultType.SUCCESS, startTime, endTime, 1, 1, 0, []))
@@ -96,30 +95,20 @@ class JUnitXmlTestEventsGenerator {
         testListener.afterSuite(testSuiteDescriptor.parent.parent, new DefaultTestResult(TestResult.ResultType.SUCCESS, 0, 0, 0, 0, 0, []))
     }
 
-    @groovy.transform.CompileStatic
-    // workaround for class org.codehaus.groovy.reflection.CachedConstructor cannot access a member of class java.lang.AssertionError (in module java.base) with modifiers "private"
-    // using Jigsaw
-    AssertionError assertionError(/*must be Object*/Object failureText) { new AssertionError(failureText) }
-
-    private void publishAdditionalMetadata(DecoratingTestDescriptor testCaseDescriptor, Object build) {
+    private void publishAdditionalMetadata(DecoratingTestDescriptor testCaseDescriptor, Build build) {
         List<String> outputs = []
-        def scenarioId = getScenarioId(build)
-        outputs.add("Scenario: ${scenarioId}")
+        def scenarioId = DistributedPerformanceTest.getScenarioId(build)
+        outputs.add("Scenario: ${scenarioId}".toString())
         if (coordinatorBuild) {
             outputs.add("Performance report: " +
                 "https://builds.gradle.org/repository/download/${coordinatorBuild.buildTypeId}/${coordinatorBuild.id}:id/results/performance/build/performance-tests/" +
-                "report/tests/${scenarioId.replaceAll(" ", "-")}.html")
+                "report/tests/${scenarioId.replaceAll(" ", "-")}.html".toString())
         }
-        def buildUrl = build.@webUrl
+        def buildUrl = build.homeUrl
         if (buildUrl) {
-            outputs.add("Worker build url: ${buildUrl}")
+            outputs.add("Worker build url: ${buildUrl}".toString())
         }
         testOutputListener.onOutput(testCaseDescriptor, new DefaultTestOutputEvent(TestOutputEvent.Destination.StdOut, outputs.join("\n")))
-    }
-
-    private String getScenarioId(Object build) {
-        NodeChildren properties = build.properties.children()
-        properties.find { it.@name == 'scenario' }.@value.text()
     }
 
     /**

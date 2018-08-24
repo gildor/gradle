@@ -310,7 +310,6 @@ class PerformanceTestPlugin : Plugin<Project> {
             configureReportProperties()
             configureForAnyPerformanceTestTask(this, performanceSourceSet, prepareSamplesTask)
             scenarioList = buildDir / Config.performanceTestScenarioListFileName
-            scenarioReport = buildDir / Config.performanceTestScenarioReportFileName
             buildTypeId = stringPropertyOrNull(PropertyNames.buildTypeId)
             workerTestTaskName = stringPropertyOrNull(PropertyNames.workerTestTaskName) ?: "fullPerformanceTest"
             coordinatorBuildId = stringPropertyOrNull(PropertyNames.coordinatorBuildId)

@@ -41,4 +41,12 @@ class PrettyCalculator {
         BigDecimal result = (current - previous) / previous * 100
         return result.setScale(2, RoundingMode.HALF_UP)
     }
+
+    static int percentage(double p) {
+        return (int) p * 100
+    }
+
+    static String percentageString(int percentage) {
+        return "$percentage %"
+    }
 }

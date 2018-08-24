@@ -17,6 +17,7 @@
 package org.gradle.performance.measure;
 
 import com.google.common.collect.Lists;
+import org.apache.commons.math3.stat.inference.MannWhitneyUTest;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -27,6 +28,7 @@ import java.util.List;
  * A collection of measurements of some given units.
  */
 public class DataSeries<Q> extends ArrayList<Amount<Q>> {
+    private static final double MINIMUM_CONFIDENCE = 0.99;
     private final Amount<Q> average;
     private final Amount<Q> median;
     private final Amount<Q> max;
@@ -102,5 +104,29 @@ public class DataSeries<Q> extends ArrayList<Amount<Q>> {
 
     public Amount<Q> getStandardError() {
         return standardError;
+    }
+
+    public static double confidenceInDifference(DataSeries first, DataSeries second) {
+        return 1 - new MannWhitneyUTest().mannWhitneyUTest(first.asDoubleArray(), second.asDoubleArray());
+    }
+
+    public boolean significantlyLessThan(DataSeries<Q> other) {
+        return this.median.compareTo(other.median) < 0 && differenceIsSignificant(this, other);
+    }
+
+    public boolean significantlyGreaterThan(DataSeries other) {
+        return this.median.compareTo(other.median) > 0 && differenceIsSignificant(this, other);
+    }
+
+    private static boolean differenceIsSignificant(DataSeries first, DataSeries second) {
+        return confidenceInDifference(first, second) > MINIMUM_CONFIDENCE;
+    }
+
+    private double[] asDoubleArray() {
+        double[] result = new double[size()];
+        for (int i = 0; i < size(); ++i) {
+            result[i] = get(i).getValue().doubleValue();
+        }
+        return result;
     }
 }

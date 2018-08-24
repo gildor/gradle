@@ -22,6 +22,10 @@ import org.gradle.api.tasks.testing.TestOutputListener
 import org.gradle.api.tasks.testing.TestResult
 import org.gradle.internal.event.ListenerBroadcast
 import spock.lang.Specification
+import org.openmbee.junit.JUnitMarshalling
+import org.openmbee.junit.model.JUnitTestSuite
+import org.jetbrains.teamcity.rest.Build
+import org.jetbrains.teamcity.rest.Parameter
 
 class JUnitXmlTestEventsGeneratorTest extends Specification {
     def "uses correct failure message"() {
@@ -44,8 +48,8 @@ class JUnitXmlTestEventsGeneratorTest extends Specification {
                   &gt; [19.901 s, 19.792 s, 19.705 s, 20.011 s, 19.751 s, 19.756 s, 19.89 s, 19.877 s, 19.726 s, 19.684 s, 19.796 s, 19.764 s, 19.709 s, 19.833 s, 19.709 s, 19.822 s, 19.871 s, 19.694 s, 19.704 s, 19.876 s]
                   Gradle 3.4-20161216000013+0000 median: 19.294 s min: 19.159 s, max: 19.445 s, se: 79.75 ms, sem: 17.833 ms
                   &gt; [19.425 s, 19.275 s, 19.334 s, 19.402 s, 19.285 s, 19.303 s, 19.415 s, 19.309 s, 19.272 s, 19.445 s, 19.236 s, 19.28 s, 19.396 s, 19.159 s, 19.213 s, 19.262 s, 19.38 s, 19.225 s, 19.22 s, 19.372 s]
-                
-                
+
+
                     at org.gradle.performance.results.CrossVersionPerformanceResults.throwAssertionErrorIfNotFlaky(CrossVersionPerformanceResults.groovy:101)
                     at org.gradle.performance.results.CrossVersionPerformanceResults.assertCurrentVersionHasNotRegressed(CrossVersionPerformanceResults.groovy:93)
                     at org.gradle.performance.fixture.CrossVersionPerformanceTestRunner.run(CrossVersionPerformanceTestRunner.groovy:121)
@@ -53,21 +57,24 @@ class JUnitXmlTestEventsGeneratorTest extends Specification {
                 </failure>
                 </testcase>
             </testsuite>""".stripIndent()
-        def gpath = new XmlSlurper().parseText(xml)
+        def testSuite = JUnitMarshalling.unmarshalTestSuite(new ByteArrayInputStream(xml.bytes))
         ListenerBroadcast<TestListener> testListenerBroadcast = Mock()
         TestListener testListener = Mock()
         ListenerBroadcast<TestOutputListener> testOutputListenerBroadcast = Mock()
         TestOutputListener testOutputListener = Mock()
         TestDescriptorInternal testDescriptor = null
         TestResult testResult = null
-        Object build = new XmlSlurper().parseText("""<build webUrl="http://some.url"><properties><property name="scenario" value="configuration of ktsManyProjects (--recompile-scripts)" inherited="false"/></properties></build>""")
+        Build build = Mock()
 
         when:
-        new JUnitXmlTestEventsGenerator(testListenerBroadcast, testOutputListenerBroadcast).processXml(gpath, build)
+        new JUnitXmlTestEventsGenerator(testListenerBroadcast, testOutputListenerBroadcast).processTestSuite(testSuite, build)
 
         then:
         _ * testListenerBroadcast.getSource() >> testListener
         _ * testOutputListenerBroadcast.getSource() >> testOutputListener
+        _ * build.getHomeUrl() >> 'http://some.url'
+        _ * build.getParameters() >> [new ParameterImpl(name: 'scenario', value: "configuration of ktsManyProjects (--recompile-scripts)")]
+
         1 * testListener.afterTest(_, _) >> { arguments ->
             testDescriptor = arguments[0]
             testResult = arguments[1]
@@ -78,5 +85,11 @@ class JUnitXmlTestEventsGeneratorTest extends Specification {
 
         testResult.resultType == TestResult.ResultType.FAILURE
         testResult.exception.toString() startsWith """java.lang.AssertionError: Speed Results for test project 'ktsManyProjects' with tasks help: we're slower than 3.4-20161216000013+0000."""
+    }
+
+    static class ParameterImpl implements Parameter {
+        String name
+        String value
+        boolean own
     }
 }
