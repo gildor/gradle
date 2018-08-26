@@ -1,22 +1,20 @@
 // tag::use-plugin[]
-apply plugin: 'announce'
+plugins {
+    announce
+}
 // end::use-plugin[]
-// tag::use-build-announcements-plugin[]
-apply plugin: 'build-announcements'
-// end::use-build-announcements-plugin[]
 
 // tag::announce-plugin-conf[]
 announce {
-  username = 'myId'
-  password = 'myPassword'
+    username = "myId"
+    password = "myPassword"
 }
 // end::announce-plugin-conf[]
 
-
 // tag::announce-usage[]
-task helloWorld {
+val helloWorld by tasks.creating {
     doLast {
-        println "Hello, world!"
+        println("Hello, world!")
     }
 }
 
