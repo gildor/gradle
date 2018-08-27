@@ -25,6 +25,7 @@ import org.gradle.api.internal.collections.CollectionEventRegister;
 import org.gradle.api.internal.collections.CollectionFilter;
 import org.gradle.api.internal.collections.ElementSource;
 import org.gradle.api.internal.collections.FilteredCollection;
+import org.gradle.api.internal.plugins.DslObject;
 import org.gradle.api.internal.provider.CollectionProviderInternal;
 import org.gradle.api.internal.provider.ProviderInternal;
 import org.gradle.api.provider.Provider;
@@ -431,7 +432,23 @@ public class DefaultDomainObjectCollection<T> extends AbstractCollection<T> impl
     }
 
     private static IllegalStateException createIllegalConfigurationException(String methodName, DomainObjectCollection<?> target) {
-        return new IllegalContainerConfigurationException(String.format("%s#%s on %s cannot be executed in the current context.", target.getClass().getSimpleName(), methodName, target));
+        return new IllegalContainerConfigurationException(String.format("%s#%s on %s cannot be executed in the current context.", publicType(target.getClass()).getSimpleName(), methodName, target));
+    }
+
+    static Class<?> publicType(Class<?> target) {
+        target = new DslObject(target).getPublicType().getConcreteClass();
+
+        Class<?>[] interfaces = target.getInterfaces();
+        assert interfaces.length > 0;
+
+        target = interfaces[0];
+        if (target.getSimpleName().endsWith("Internal")) {
+            interfaces = target.getInterfaces();
+            assert interfaces.length > 0;
+            return interfaces[0];
+        }
+
+        return target;
     }
 
     @Contextual

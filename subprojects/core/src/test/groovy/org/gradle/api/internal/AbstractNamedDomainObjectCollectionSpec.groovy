@@ -57,7 +57,7 @@ abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomain
 
         then:
         def ex = thrown(IllegalStateException)
-        ex.message == "${container.class.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
+        ex.message == "${containerPublicType.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
 
         where:
         [description, factoryClass] << getInvalidCallFromLazyConfiguration()
@@ -86,7 +86,7 @@ abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomain
         then:
         def ex = thrown(IllegalStateException)
         ex.message == "Could not create domain object 'a' (${type.simpleName})"
-        ex.cause.message == "${container.class.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
+        ex.cause.message == "${containerPublicType.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
 
         where:
         [description, factoryClass] << getInvalidCallFromLazyConfiguration()

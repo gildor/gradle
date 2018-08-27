@@ -24,8 +24,16 @@ import org.junit.Assume
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallAddAllFactory
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallAddAllLaterFactory
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallAddFactory
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallAddLaterFactory
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallClearFactory
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallRemoveAllFactory
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallRemoveFactory
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallRemoveOnIteratorFactory
+import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.CallRetainAllFactory
 import static org.gradle.util.WrapUtil.toList
-import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.*
 
 abstract class AbstractDomainObjectCollectionSpec<T> extends Specification {
     abstract DomainObjectCollection<T> getContainer()
@@ -54,6 +62,10 @@ abstract class AbstractDomainObjectCollectionSpec<T> extends Specification {
 
     void containerAllowsExternalProviders() {
         Assume.assumeTrue("the container doesn't allow external provider to be added", isExternalProviderAllowed())
+    }
+
+    Class<? extends DomainObjectCollection<T>> getContainerPublicType() {
+        return DefaultDomainObjectCollection.publicType(container.class)
     }
 
     def setup() {
@@ -1455,7 +1467,7 @@ abstract class AbstractDomainObjectCollectionSpec<T> extends Specification {
 
         then:
         def ex = thrown(IllegalStateException)
-        ex.message == "${container.class.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
+        ex.message == "${containerPublicType.simpleName}#${description} on ${container.toString()} cannot be executed in the current context."
 
         where:
         [description, factoryClass] << getInvalidCallFromLazyConfiguration()
