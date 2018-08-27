@@ -82,6 +82,10 @@ public class ListElementSource<T> extends AbstractIterationOrderRetainingElement
 
     @Override
     public boolean add(T element) {
+        if (isRealizing()) {
+            return true;
+        }
+
         modCount++;
         return getInserted().add(new Element<T>(element));
     }

@@ -16,6 +16,8 @@
 
 package org.gradle.api.internal.collections
 
+import org.gradle.api.internal.provider.ProviderInternal
+
 abstract class AbstractIterationOrderRetainingElementSourceTest extends AbstractElementSourceTest {
     @Override
     List<CharSequence> iterationOrder(CharSequence... values) {
@@ -192,5 +194,23 @@ abstract class AbstractIterationOrderRetainingElementSourceTest extends Abstract
 
         then:
         thrown(ConcurrentModificationException)
+    }
+
+    def "can call add from within provider realization without throwing exception"() {
+        given:
+        def provider = Mock(ProviderInternal) {
+            get() >> {
+                assert source.add("bar")
+                return "bar"
+            }
+        }
+        source.addPending(provider)
+
+        when:
+        def iterator = source.iterator()
+
+        then:
+        noExceptionThrown()
+        iterator.next() == "bar"
     }
 }

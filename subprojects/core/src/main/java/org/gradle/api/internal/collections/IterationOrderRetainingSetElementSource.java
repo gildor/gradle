@@ -46,6 +46,10 @@ public class IterationOrderRetainingSetElementSource<T> extends AbstractIteratio
 
     @Override
     public boolean add(T element) {
+        if (isRealizing()) {
+            return true;
+        }
+
         modCount++;
         if (!Iterators.contains(iteratorNoFlush(), element)) {
             getInserted().add(new Element<T>(element));

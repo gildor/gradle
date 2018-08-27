@@ -21,7 +21,7 @@ import org.gradle.api.NamedDomainObjectCollection
 import org.gradle.api.internal.provider.ProviderInternal
 import spock.lang.Unroll
 
-import static org.gradle.api.internal.DomainObjectCollectionConfigurationFactories.*
+import static org.gradle.util.WrapUtil.toList
 
 abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomainObjectCollectionSpec<T> {
     abstract NamedDomainObjectCollection<T> getContainer()
@@ -99,8 +99,12 @@ abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomain
         given:
         _ * provider.type >> type
         _ * provider.name >> "a"
-        _ * provider.get() >> a
+
+        when:
         container.addLater(provider)
+
+        then:
+        0 * provider.get()
 
         when:
         def domainObjectProvider = container.named("a")
@@ -108,8 +112,108 @@ abstract class AbstractNamedDomainObjectCollectionSpec<T> extends AbstractDomain
         then:
         domainObjectProvider.name == "a"
         domainObjectProvider.present
-        domainObjectProvider.get() == a
         domainObjectProvider.type == type
+
+        when:
+        def r = domainObjectProvider.get()
+
+        then:
+        r == a
+
+        and:
+        _ * provider.get() >> a
+    }
+
+    def "does not add external provider if realized element already exists"() {
+        containerAllowsExternalProviders()
+        def provider = Mock(NamedProviderInternal)
+
+        given:
+        _ * provider.type >> type
+        _ * provider.name >> "a"
+        container.add(a)
+
+        when:
+        container.addLater(provider)
+
+        then:
+        1 * provider.get() >> a
+
+        when:
+        def result = toList(container)
+
+        then:
+        result == iterationOrder(a)
+
+        and:
+        _ * provider.get() >> a
+    }
+
+    def "does not add external provider if unrealized element exists"() {
+        containerAllowsExternalProviders()
+        def provider1 = Mock(NamedProviderInternal)
+        def provider2 = Mock(NamedProviderInternal)
+
+        given:
+        _ * provider1.type >> type
+        _ * provider1.name >> "a"
+        container.addLater(provider1)
+
+        when:
+        container.addLater(provider2)
+
+        then:
+        1 * provider2.name >> "a"
+        1 * provider2.get() >> a
+
+        when:
+        def result = toList(container)
+
+        then:
+        result == iterationOrder(a)
+
+        and:
+        1 * provider1.get() >> a
+    }
+
+    def "can realize iterate through container containing unrealized external provider"() {
+        containerAllowsExternalProviders()
+        def provider = Mock(NamedProviderInternal)
+
+        given:
+        _ * provider.type >> type
+        _ * provider.name >> "a"
+        container.addLater(provider)
+
+        when:
+        def result = toList(container)
+
+        then:
+        noExceptionThrown()
+        result == iterationOrder(a)
+
+        and:
+        1 * provider.get() >> a
+    }
+
+    def "can realize iterated through filtered container containing unrealized external provider"() {
+        containerAllowsExternalProviders()
+        def provider = Mock(NamedProviderInternal)
+
+        given:
+        _ * provider.type >> type
+        _ * provider.name >> "a"
+        container.addLater(provider)
+
+        when:
+        def result = toList(container.withType(type))
+
+        then:
+        noExceptionThrown()
+        result == iterationOrder(a)
+
+        and:
+        1 * provider.get() >> a
     }
 
     interface NamedProviderInternal extends Named, ProviderInternal {}

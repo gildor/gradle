@@ -43,6 +43,8 @@ abstract public class AbstractIterationOrderRetainingElementSource<T> implements
 
     protected int modCount;
 
+    private boolean realizing = false;
+
     List<Element<T>> getInserted() {
         return inserted;
     }
@@ -111,23 +113,39 @@ abstract public class AbstractIterationOrderRetainingElementSource<T> implements
 
     }
 
+    protected boolean isRealizing() {
+        return realizing;
+    }
+
     @Override
     public void realizePending() {
-        for (Element<T> element : inserted) {
-            if (!element.isRealized()) {
-                modCount++;
-                element.realize();
+        boolean oldRealizing = realizing;
+        try {
+            realizing = true;
+            for (Element<T> element : inserted) {
+                if (!element.isRealized()) {
+                    modCount++;
+                    element.realize();
+                }
             }
+        } finally {
+            realizing = oldRealizing;
         }
     }
 
     @Override
     public void realizePending(Class<?> type) {
-        for (Element<T> element : inserted) {
-            if (!element.isRealized() && (element.getType() == null || type.isAssignableFrom(element.getType()))) {
-                modCount++;
-                element.realize();
+        boolean oldRealizing = realizing;
+        try {
+            realizing = true;
+            for (Element<T> element : inserted) {
+                if (!element.isRealized() && (element.getType() == null || type.isAssignableFrom(element.getType()))) {
+                    modCount++;
+                    element.realize();
+                }
             }
+        } finally {
+            realizing = oldRealizing;
         }
     }
 
