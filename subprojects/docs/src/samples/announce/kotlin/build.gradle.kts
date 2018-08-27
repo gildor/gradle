@@ -12,13 +12,13 @@ announce {
 // end::announce-plugin-conf[]
 
 // tag::announce-usage[]
-val helloWorld by tasks.creating {
+task("helloWorld") {
     doLast {
         println("Hello, world!")
     }
 }
 
-helloWorld.doLast {
+tasks.getByName("helloWorld").doLast {
     announce.announce("helloWorld completed!", "twitter")
     announce.announce("helloWorld completed!", "local")
 }
