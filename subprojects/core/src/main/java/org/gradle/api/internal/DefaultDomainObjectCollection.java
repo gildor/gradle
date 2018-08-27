@@ -255,7 +255,6 @@ public class DefaultDomainObjectCollection<T> extends AbstractCollection<T> impl
     }
 
     protected <I extends T> boolean add(I toAdd, Action<? super I> notification) {
-        assertMutable("add(I, Action)");
         return doAdd(toAdd, notification);
     }
 
