@@ -942,7 +942,7 @@ public class DefaultNamedDomainObjectCollection<T> extends DefaultDomainObjectCo
                 object = createDomainObject();
 
                 // Register the domain object
-                add(object, withContainerMutationDisabled(onCreate));
+                add(object, onCreate);
                 realized(AbstractDomainObjectCreatingProvider.this);
                 onLazyDomainObjectRealized();
             } catch (Throwable ex) {
