@@ -96,4 +96,6 @@ public interface TaskInternal extends Task, Configurable<Task> {
      */
     @Deprecated
     void replaceLogger(Logger logger);
+
+    long getTimeoutInMillis();
 }

@@ -85,7 +85,7 @@ public class DefaultTestExecuter implements TestExecuter<JvmTestExecutionSpec> {
         final Set<File> classpath = ImmutableSet.copyOf(testExecutionSpec.getClasspath());
         final Factory<TestClassProcessor> forkingProcessorFactory = new Factory<TestClassProcessor>() {
             public TestClassProcessor create() {
-                return new ForkingTestClassProcessor(currentWorkerLease, workerFactory, testInstanceFactory, testExecutionSpec.getJavaForkOptions(),
+                return new ForkingTestClassProcessor(workerFactory, testInstanceFactory, testExecutionSpec.getJavaForkOptions(),
                     classpath, testFramework.getWorkerConfigurationAction(), moduleRegistry, documentationRegistry);
             }
         };
@@ -97,7 +97,7 @@ public class DefaultTestExecuter implements TestExecuter<JvmTestExecutionSpec> {
         processor =
             new PatternMatchTestClassProcessor(testFilter,
                 new RunPreviousFailedFirstTestClassProcessor(testExecutionSpec.getPreviousFailedTestClasses(),
-                    new MaxNParallelTestClassProcessor(getMaxParallelForks(testExecutionSpec), reforkingProcessorFactory, actorFactory)));
+                    new MaxNParallelTestClassProcessor(currentWorkerLease, getMaxParallelForks(testExecutionSpec), reforkingProcessorFactory, actorFactory)));
 
         final FileTree testClassFiles = testExecutionSpec.getCandidateClassFiles();
 

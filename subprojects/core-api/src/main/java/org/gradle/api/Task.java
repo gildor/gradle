@@ -36,6 +36,7 @@ import javax.annotation.Nullable;
 import java.io.File;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>A <code>Task</code> represents a single atomic piece of work for a build, such as compiling classes or generating
@@ -746,4 +747,6 @@ public interface Task extends Comparable<Task>, ExtensionAware {
     @Incubating
     @Internal
     TaskDependency getShouldRunAfter();
+
+    void timeoutAfter(long time, TimeUnit units);
 }

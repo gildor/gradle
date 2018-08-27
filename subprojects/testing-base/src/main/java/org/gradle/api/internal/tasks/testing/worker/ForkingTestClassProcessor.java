@@ -25,7 +25,6 @@ import org.gradle.api.internal.tasks.testing.TestClassRunInfo;
 import org.gradle.api.internal.tasks.testing.TestResultProcessor;
 import org.gradle.api.internal.tasks.testing.WorkerTestClassProcessorFactory;
 import org.gradle.internal.remote.ObjectConnection;
-import org.gradle.internal.work.WorkerLeaseRegistry;
 import org.gradle.process.JavaForkOptions;
 import org.gradle.process.internal.ExecException;
 import org.gradle.process.internal.worker.WorkerProcess;
@@ -40,7 +39,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class ForkingTestClassProcessor implements TestClassProcessor {
-    private final WorkerLeaseRegistry.WorkerLease currentWorkerLease;
     private final WorkerProcessFactory workerFactory;
     private final WorkerTestClassProcessorFactory processorFactory;
     private final JavaForkOptions options;
@@ -51,12 +49,10 @@ public class ForkingTestClassProcessor implements TestClassProcessor {
     private RemoteTestClassProcessor remoteProcessor;
     private WorkerProcess workerProcess;
     private TestResultProcessor resultProcessor;
-    private WorkerLeaseRegistry.WorkerLeaseCompletion completion;
     private DocumentationRegistry documentationRegistry;
     private boolean stoppedNow;
 
-    public ForkingTestClassProcessor(WorkerLeaseRegistry.WorkerLease parentWorkerLease, WorkerProcessFactory workerFactory, WorkerTestClassProcessorFactory processorFactory, JavaForkOptions options, Iterable<File> classPath, Action<WorkerProcessBuilder> buildConfigAction, ModuleRegistry moduleRegistry, DocumentationRegistry documentationRegistry) {
-        this.currentWorkerLease = parentWorkerLease;
+    public ForkingTestClassProcessor(WorkerProcessFactory workerFactory, WorkerTestClassProcessorFactory processorFactory, JavaForkOptions options, Iterable<File> classPath, Action<WorkerProcessBuilder> buildConfigAction, ModuleRegistry moduleRegistry, DocumentationRegistry documentationRegistry) {
         this.workerFactory = workerFactory;
         this.processorFactory = processorFactory;
         this.options = options;
@@ -80,7 +76,6 @@ public class ForkingTestClassProcessor implements TestClassProcessor {
             }
 
             if (remoteProcessor == null) {
-                completion = currentWorkerLease.startChild();
                 JULRedirector.checkDeprecatedProperty(options);
                 remoteProcessor = forkProcess();
             }
@@ -158,7 +153,6 @@ public class ForkingTestClassProcessor implements TestClassProcessor {
                         + documentationRegistry.getDocumentationFor("java_plugin", "sec:test_execution"), e.getCause());
                 }
             } finally {
-                completion.leaseFinish();
             }
         }
     }

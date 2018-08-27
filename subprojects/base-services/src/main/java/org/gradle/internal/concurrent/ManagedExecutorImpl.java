@@ -83,6 +83,8 @@ class ManagedExecutorImpl extends AbstractDelegatingExecutorService implements M
                 throw new IllegalStateException("Timeout waiting for concurrent jobs to complete.");
             }
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            executor.shutdownNow();
             throw new UncheckedException(e);
         }
         executorPolicy.onStop();

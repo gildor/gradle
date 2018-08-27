@@ -21,16 +21,18 @@ import org.gradle.api.internal.tasks.testing.TestClassRunInfo
 import org.gradle.api.internal.tasks.testing.TestResultProcessor
 import org.gradle.internal.actor.Actor
 import org.gradle.internal.actor.ActorFactory
+import org.gradle.internal.work.WorkerLeaseRegistry
 import spock.lang.Specification
 import org.gradle.internal.Factory
 
 class MaxNParallelTestClassProcessorTest extends Specification {
+    WorkerLeaseRegistry.WorkerLease workerLease = Stub(WorkerLeaseRegistry.WorkerLease)
     private final Factory<TestClassProcessor> factory = Mock()
     private final TestResultProcessor resultProcessor = Mock()
     private final TestResultProcessor asyncResultProcessor = Mock()
     private final Actor resultProcessorActor = Mock()
     private final ActorFactory actorFactory = Mock()
-    private final MaxNParallelTestClassProcessor processor = new MaxNParallelTestClassProcessor(2, factory, actorFactory)
+    private final MaxNParallelTestClassProcessor processor = new MaxNParallelTestClassProcessor(workerLease, 2, factory, actorFactory)
 
     def createsThreadSafeWrapperForResultProcessorOnStart() {
         when:

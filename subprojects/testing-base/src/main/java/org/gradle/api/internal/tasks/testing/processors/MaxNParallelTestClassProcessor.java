@@ -20,11 +20,10 @@ import org.gradle.api.internal.tasks.testing.TestClassProcessor;
 import org.gradle.api.internal.tasks.testing.TestClassRunInfo;
 import org.gradle.api.internal.tasks.testing.TestResultProcessor;
 import org.gradle.internal.Factory;
-import org.gradle.internal.UncheckedException;
 import org.gradle.internal.actor.Actor;
 import org.gradle.internal.actor.ActorFactory;
 import org.gradle.internal.concurrent.CompositeStoppable;
-import org.gradle.internal.dispatch.DispatchException;
+import org.gradle.internal.work.WorkerLeaseRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,18 +33,21 @@ import java.util.List;
  * processors.
  */
 public class MaxNParallelTestClassProcessor implements TestClassProcessor {
+    private final WorkerLeaseRegistry.WorkerLease currentWorkerLease;
     private final int maxProcessors;
     private final Factory<TestClassProcessor> factory;
     private final ActorFactory actorFactory;
     private TestResultProcessor resultProcessor;
     private int pos;
     private List<TestClassProcessor> processors = new ArrayList<TestClassProcessor>();
+    private List<WorkerLeaseRegistry.WorkerLeaseCompletion> leases = new ArrayList<WorkerLeaseRegistry.WorkerLeaseCompletion>();
     private List<TestClassProcessor> rawProcessors = new ArrayList<TestClassProcessor>();
     private List<Actor> actors = new ArrayList<Actor>();
     private Actor resultProcessorActor;
     private volatile boolean stoppedNow;
 
-    public MaxNParallelTestClassProcessor(int maxProcessors, Factory<TestClassProcessor> factory, ActorFactory actorFactory) {
+    public MaxNParallelTestClassProcessor(WorkerLeaseRegistry.WorkerLease currentWorkerLease, int maxProcessors, Factory<TestClassProcessor> factory, ActorFactory actorFactory) {
+        this.currentWorkerLease = currentWorkerLease;
         this.maxProcessors = maxProcessors;
         this.factory = factory;
         this.actorFactory = actorFactory;
@@ -66,6 +68,7 @@ public class MaxNParallelTestClassProcessor implements TestClassProcessor {
 
         TestClassProcessor processor;
         if (processors.size() < maxProcessors) {
+            leases.add(currentWorkerLease.startChild());
             processor = factory.create();
             rawProcessors.add(processor);
             Actor actor = actorFactory.createActor(processor);
@@ -84,8 +87,14 @@ public class MaxNParallelTestClassProcessor implements TestClassProcessor {
     public void stop() {
         try {
             CompositeStoppable.stoppable(processors).add(actors).add(resultProcessorActor).stop();
-        } catch (DispatchException e) {
-            throw UncheckedException.throwAsUncheckedException(e.getCause());
+        } finally {
+            try {
+                stopNow();
+            } finally {
+                for (WorkerLeaseRegistry.WorkerLeaseCompletion lease : leases) {
+                    lease.leaseFinish();
+                }
+            }
         }
     }
 

@@ -21,7 +21,8 @@ import org.gradle.internal.concurrent.AsyncStoppable;
 import org.gradle.internal.operations.CurrentBuildOperationPreservingRunnable;
 
 import java.util.LinkedList;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -40,20 +41,16 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
     private final Lock lock = new ReentrantLock();
     private final Condition condition = lock.newCondition();
     private final LinkedList<T> queue = new LinkedList<T>();
-    private final Executor executor;
+    private final ExecutorService executor;
     private final int maxQueueSize;
     private int dispatchers;
     private State state;
 
-    public AsyncDispatch(Executor executor) {
+    public AsyncDispatch(ExecutorService executor) {
         this(executor, null, MAX_QUEUE_SIZE);
     }
 
-    public AsyncDispatch(Executor executor, final Dispatch<? super T> dispatch) {
-        this(executor, dispatch, MAX_QUEUE_SIZE);
-    }
-
-    public AsyncDispatch(Executor executor, final Dispatch<? super T> dispatch, int maxQueueSize) {
+    public AsyncDispatch(ExecutorService executor, final Dispatch<? super T> dispatch, int maxQueueSize) {
         this.executor = executor;
         this.maxQueueSize = maxQueueSize;
         state = State.Init;
@@ -114,6 +111,7 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
                     try {
                         condition.await();
                     } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
                         throw new UncheckedException(e);
                     }
                 }
@@ -141,6 +139,7 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
                 try {
                     condition.await();
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     throw new UncheckedException(e);
                 }
             }
@@ -183,9 +182,11 @@ public class AsyncDispatch<T> implements Dispatch<T>, AsyncStoppable {
 
             if (!queue.isEmpty()) {
                 throw new IllegalStateException(
-                        "Cannot wait for messages to be dispatched, as there are no dispatch threads running.");
+                    "Cannot wait for messages to be dispatched, as there are no dispatch threads running.");
             }
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            executor.shutdownNow();
             throw new UncheckedException(e);
         } finally {
             lock.unlock();

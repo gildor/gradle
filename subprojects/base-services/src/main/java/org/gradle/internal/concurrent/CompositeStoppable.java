@@ -105,7 +105,10 @@ public class CompositeStoppable implements Stoppable {
                     if (failure == null) {
                         failure = throwable;
                     } else {
-                        LOGGER.error(String.format("Could not stop %s.", element), throwable);
+                        if (!Thread.currentThread().isInterrupted()) {
+                            //TODO find a better way to handle interrupts (which almost always lead to exceptions when thrown during stop)
+                            LOGGER.error(String.format("Could not stop %s.", element), throwable);
+                        }
                     }
                 }
             }

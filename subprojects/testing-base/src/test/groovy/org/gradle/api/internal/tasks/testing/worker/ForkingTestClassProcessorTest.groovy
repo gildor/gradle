@@ -24,7 +24,6 @@ import org.gradle.api.internal.tasks.testing.TestClassRunInfo
 import org.gradle.api.internal.tasks.testing.WorkerTestClassProcessorFactory
 import org.gradle.internal.classpath.ClassPath
 import org.gradle.internal.remote.ObjectConnection
-import org.gradle.internal.work.WorkerLeaseRegistry
 import org.gradle.process.JavaForkOptions
 import org.gradle.process.internal.ExecException
 import org.gradle.process.internal.JavaExecHandleBuilder
@@ -35,7 +34,6 @@ import spock.lang.Specification
 import spock.lang.Subject
 
 class ForkingTestClassProcessorTest extends Specification {
-    WorkerLeaseRegistry.WorkerLease workerLease = Mock(WorkerLeaseRegistry.WorkerLease)
     WorkerProcessBuilder workerProcessBuilder = Mock(WorkerProcessBuilder)
     WorkerProcess workerProcess = Mock(WorkerProcess)
     ModuleRegistry moduleRegistry = Mock(ModuleRegistry)
@@ -44,7 +42,7 @@ class ForkingTestClassProcessorTest extends Specification {
     JavaForkOptions options = Stub(JavaForkOptions)
 
     @Subject
-        processor = Spy(ForkingTestClassProcessor, constructorArgs: [workerLease, workerProcessFactory, Mock(WorkerTestClassProcessorFactory), options, [new File("classpath.jar")], Mock(Action), moduleRegistry, documentationRegistry])
+        processor = Spy(ForkingTestClassProcessor, constructorArgs: [workerProcessFactory, Mock(WorkerTestClassProcessorFactory), options, [new File("classpath.jar")], Mock(Action), moduleRegistry, documentationRegistry])
 
     def setup() {
         workerProcessBuilder.build() >> workerProcess
@@ -63,7 +61,6 @@ class ForkingTestClassProcessorTest extends Specification {
         processor.processTestClass(test2)
 
         then:
-        1 * workerLease.startChild()
         1 * processor.forkProcess() >> remoteProcessor
         1 * remoteProcessor.processTestClass(test1)
         1 * remoteProcessor.processTestClass(test2)
@@ -93,7 +90,7 @@ class ForkingTestClassProcessorTest extends Specification {
     }
 
     def "stopNow propagates to worker process"() {
-        ForkingTestClassProcessor processor = new ForkingTestClassProcessor(Stub(WorkerLeaseRegistry.WorkerLease), workerProcessFactory, Mock(WorkerTestClassProcessorFactory), options, [new File("classpath.jar")], Mock(Action), Stub(ModuleRegistry), documentationRegistry)
+        ForkingTestClassProcessor processor = new ForkingTestClassProcessor(workerProcessFactory, Mock(WorkerTestClassProcessorFactory), options, [new File("classpath.jar")], Mock(Action), Stub(ModuleRegistry), documentationRegistry)
 
         setup:
         1 * workerProcess.getConnection() >> Stub(ObjectConnection) { addOutgoing(_) >> Stub(RemoteTestClassProcessor) }
@@ -107,7 +104,7 @@ class ForkingTestClassProcessorTest extends Specification {
     }
 
     def "no exception when stop after stopNow"() {
-        ForkingTestClassProcessor processor = new ForkingTestClassProcessor(Stub(WorkerLeaseRegistry.WorkerLease), workerProcessFactory, Mock(WorkerTestClassProcessorFactory), options, [new File("classpath.jar")], Mock(Action), Stub(ModuleRegistry), documentationRegistry)
+        ForkingTestClassProcessor processor = new ForkingTestClassProcessor(workerProcessFactory, Mock(WorkerTestClassProcessorFactory), options, [new File("classpath.jar")], Mock(Action), Stub(ModuleRegistry), documentationRegistry)
 
         setup:
         1 * workerProcess.getConnection() >> Stub(ObjectConnection) { addOutgoing(_) >> Stub(RemoteTestClassProcessor) }
