@@ -167,6 +167,7 @@ class DistributedPerformanceTest extends PerformanceTest {
     private void generatePerformanceReport() {
         project.delete(reportDir)
         File resultJson = generateResultJson()
+        LOGGER.warn("Start generation: ${resultJson}")
         project.javaexec(new Action<JavaExecSpec>() {
             void execute(JavaExecSpec spec) {
                 spec.setMain("org.gradle.performance.results.ReportGenerator")
