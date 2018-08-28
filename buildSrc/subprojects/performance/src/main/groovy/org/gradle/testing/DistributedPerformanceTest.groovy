@@ -32,6 +32,7 @@ import org.gradle.initialization.BuildCancellationToken
 import org.gradle.process.CommandLineArgumentProvider
 import groovyx.net.http.RESTClient
 import groovyx.net.http.ContentType
+import groovyx.net.http.HttpResponseException
 
 import javax.inject.Inject
 import java.util.concurrent.TimeUnit
@@ -135,7 +136,6 @@ class DistributedPerformanceTest extends PerformanceTest {
 
     @TaskAction
     void executeTests() {
-        LOGGER.quiet("start")
         createWorkerTestResultsTempDir()
         try {
             doExecuteTests()
@@ -153,7 +153,6 @@ class DistributedPerformanceTest extends PerformanceTest {
         List resultData = finishedBuilds.collect {
             // org.gradle.performance.results.ScenarioBuildResultData
             [name: getScenarioId(it),
-             buildTypeId: it.buildConfigurationId.toString(),
              webUrl: it.homeUrl,
              successful: it.status == BuildStatus.SUCCESS]
         }
@@ -162,7 +161,7 @@ class DistributedPerformanceTest extends PerformanceTest {
     }
 
     static String getScenarioId(Build build) {
-        return build.parameters.find { it.name == 'scenario'} .value
+        return build.parameters.find { it.name == 'scenario' }.value
     }
 
     private void generatePerformanceReport() {
@@ -225,33 +224,31 @@ class DistributedPerformanceTest extends PerformanceTest {
     @TypeChecked(TypeCheckingMode.SKIP)
     private void schedule(Scenario scenario, String lastChangeId) {
         Map<String, Object> requestData = [
-            buildType: [id: buildTypeId],
+            buildTypeId: buildTypeId,
             properties: [
-                [name: 'scenario', value: scenario.id],
-                [name: 'templates', value: scenario.templates.join(' ')],
-                [name: 'baselines', value: baselines ?: 'defaults'],
-                [name: 'warmups', value: warmups ?: 'defaults'],
-                [name: 'runs', value: runs ?: 'defaults'],
-                [name: 'checks', value: checks ?: 'all'],
-                [name: 'channel', value: channel ?: 'commits'],
+                property: [
+                    [name: 'scenario', value: scenario.id],
+                    [name: 'templates', value: scenario.templates.join(' ')],
+                    [name: 'baselines', value: baselines ?: 'defaults'],
+                    [name: 'warmups', value: warmups ?: 'defaults'],
+                    [name: 'runs', value: runs ?: 'defaults'],
+                    [name: 'checks', value: checks ?: 'all'],
+                    [name: 'channel', value: channel ?: 'commits'],
+                ]
             ]
         ]
         if (branchName) {
             requestData['branchName'] = branchName
         }
         if (lastChangeId) {
-            requestData['lastChanges'] = [change: [id: lastChangeId]]
+            requestData['lastChanges'] = [change: [[id: lastChangeId]]]
         }
 
         String requestJson = JsonOutput.toJson(requestData)
 
         logger.info("Scheduling $scenario.id, estimated runtime: $scenario.estimatedRuntime, coordinatorBuildId: $coordinatorBuildId, lastChangeId: $lastChangeId, build request: $requestJson")
 
-        def response = httpClient.post(
-            path: "buildQueue",
-            requestContentType: ContentType.JSON,
-            body: requestJson
-        )
+        def response = triggerBuild(requestJson)
 
         /*
         {
@@ -287,7 +284,6 @@ class DistributedPerformanceTest extends PerformanceTest {
         }
          */
         String workerBuildId = response.data.id
-
         cancellationToken.addCallback {
             cancel(workerBuildId)
         }
@@ -298,17 +294,29 @@ class DistributedPerformanceTest extends PerformanceTest {
         scheduledBuildIds += workerBuildId
     }
 
+    def triggerBuild(String requestJson) {
+        try {
+            return httpClient.post(
+                path: "buildQueue",
+                requestContentType: ContentType.JSON,
+                contentType: ContentType.JSON,
+                body: requestJson)
+        } catch (HttpResponseException ex) {
+            throw new RuntimeException("Get response ${ex.response.status}\n${ex.response.data}")
+        }
+    }
+
     private Build locateBuild(String buildId) {
         return buildId == null ? null : client.build(new BuildId(buildId))
     }
 
     private String findLastChangeId(Build build) {
-        return (build == null || build.changes.empty) ? null : build.changes[0].version
+        return (build == null || build.changes.empty) ? null : build.changes[0].id
     }
 
     @TypeChecked(TypeCheckingMode.SKIP)
     private String findLastChangeIdInJson(def data) {
-        return data?.lastChanges?.change[0]
+        return data?.lastChanges?.change?.get(0)?.id
     }
 
     private void join(String workerBuildId) {
@@ -361,7 +369,14 @@ class DistributedPerformanceTest extends PerformanceTest {
             def entry
             while (entry = zipInput.nextEntry) {
                 if (!entry.isDirectory() && entry.name.endsWith('.xml')) {
-                    parsedXmls.add(JUnitMarshalling.unmarshalTestSuite(zipInput))
+                    PipedOutputStream os = new PipedOutputStream()
+                    PipedInputStream is = new PipedInputStream(os)
+                    Thread.start {
+                        os.withStream {
+                            it << zipInput
+                        }
+                    }
+                    parsedXmls.add(JUnitMarshalling.unmarshalTestSuite(is))
                 }
             }
         }
