@@ -20,6 +20,7 @@ import org.gradle.integtests.fixtures.AbstractHttpDependencyResolutionTest
 import org.gradle.integtests.fixtures.FeaturePreviewsFixture
 import org.gradle.integtests.fixtures.resolve.ResolveTestFixture
 import org.gradle.test.fixtures.maven.MavenModule
+import spock.lang.Ignore
 
 class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTest {
     def resolve = new ResolveTestFixture(buildFile).expectDefaultConfiguration('runtime')
@@ -50,7 +51,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
         buildFile << """
             dependencies {
                 compile "group:moduleA"
-                compile "group:bom:1.0"
+                compile platform("group:bom:1.0")
             }
         """
 
@@ -60,7 +61,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
         then:
         resolve.expectGraph {
             root(':', ':testproject:') {
-                module("group:bom:1.0") {
+                module("group:bom:1.0:platform-runtime") {
                     module("group:moduleA:2.0")
                     noArtifacts()
                 }
@@ -69,6 +70,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
         }
     }
 
+    @Ignore("This is no longer true, since a dependency on a BOM is by default a dependency on a library")
     def "can import a bom transitively"() {
         given:
         bomDependency('moduleA').publish()
@@ -109,7 +111,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
                 compile("group:moduleA") {
                     exclude(group: 'group')
                 }
-                compile "group:bom:1.0"
+                compile platform("group:bom:1.0")
             }
         """
 
@@ -119,7 +121,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
         then:
         resolve.expectGraph {
             root(':', ':testproject:') {
-                module("group:bom:1.0") {
+                module("group:bom:1.0:platform-runtime") {
                     module("group:moduleA:2.0")
                     noArtifacts()
                 }
@@ -135,7 +137,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
         then:
         resolve.expectGraph {
             root(':', ':testproject:') {
-                module("group:bom:1.0") {
+                module("group:bom:1.0:platform-runtime") {
                     module("group:moduleA:2.0") {
                         module("group:moduleC:1.0")
                     }
@@ -146,6 +148,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
         }
     }
 
+    @Ignore("This isn't true anymore: a POM is either a platform (BOM) or a library")
     def "a bom can declare dependencies"() {
         given:
         mavenHttpRepo.module('group', 'moduleC', '1.0').allowAll().publish()
@@ -286,7 +289,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
                 compile("group:moduleA") {
                     exclude(group: 'group')
                 }
-                compile "group:bom:1.0"
+                compile platform("group:bom:1.0")
             }
         """
 
@@ -296,7 +299,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
         then:
         resolve.expectGraph {
             root(':', ':testproject:') {
-                module("group:bom:1.0") {
+                module("group:bom:1.0:platform-runtime") {
                     module("group:moduleA:2.0")
                     noArtifacts()
                 }
@@ -315,7 +318,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
                 compile("group:moduleA") {
                     transitive = false
                 }
-                compile "group:bom:1.0"
+                compile platform("group:bom:1.0")
             }
         """
 
@@ -325,7 +328,7 @@ class MavenBomResolveIntegrationTest extends AbstractHttpDependencyResolutionTes
         then:
         resolve.expectGraph {
             root(':', ':testproject:') {
-                module("group:bom:1.0") {
+                module("group:bom:1.0:platform-runtime") {
                     module("group:moduleA:2.0")
                     noArtifacts()
                 }

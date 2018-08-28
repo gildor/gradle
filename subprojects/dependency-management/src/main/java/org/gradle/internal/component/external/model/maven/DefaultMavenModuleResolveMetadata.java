@@ -119,7 +119,7 @@ public class DefaultMavenModuleResolveMetadata extends AbstractLazyModuleCompone
     private ConfigurationMetadata libraryWithUsageAttribute(DefaultConfigurationMetadata conf, String usage, ImmutableAttributesFactory attributesFactory) {
         ImmutableAttributes attributes = attributesFactory.concat(getAttributes().asImmutable(), USAGE_ATTRIBUTE, new CoercingStringValueSnapshot(usage, objectInstantiator));
         attributes = attributesFactory.concat(attributes, PlatformSupport.COMPONENT_CATEGORY, PlatformSupport.LIBRARY);
-        return conf.withAttributes(attributes);
+        return conf.withAttributes(attributes).withoutPending();
     }
 
     private ConfigurationMetadata platformWithUsageAttribute(DefaultConfigurationMetadata conf, String usage, ImmutableAttributesFactory attributesFactory, boolean enforcedPlatform) {
@@ -127,7 +127,11 @@ public class DefaultMavenModuleResolveMetadata extends AbstractLazyModuleCompone
         String componentType = enforcedPlatform ? PlatformSupport.ENFORCED_PLATFORM : PlatformSupport.REGULAR_PLATFORM;
         attributes = attributesFactory.concat(attributes, PlatformSupport.COMPONENT_CATEGORY, componentType);
         String prefix = enforcedPlatform ? "enforced-platform-" : "platform-";
-        return conf.withAttributes(prefix + conf.getName(), attributes);
+        DefaultConfigurationMetadata metadata = conf.withAttributes(prefix + conf.getName(), attributes);
+        if (enforcedPlatform) {
+            metadata = metadata.withForcedDependencies();
+        }
+        return metadata.withPendingOnly();
     }
 
     private ImmutableList<? extends ModuleComponentArtifactMetadata> getArtifactsForConfiguration(String name) {
