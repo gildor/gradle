@@ -168,4 +168,18 @@ public abstract class AbstractCollectionProperty<T, C extends Collection<T>> ext
     public <S> ProviderInternal<S> map(final Transformer<? extends S, ? super C> transformer) {
         return new TransformBackedProvider<S, C>(transformer, this);
     }
+
+    @Override
+    public Class<? extends T> getElementType() {
+        return elementType;
+    }
+
+    @Override
+    public int size() {
+        int result = 0;
+        for (Collector<T> collector : collectors) {
+            result += collector.size();
+        }
+        return result;
+    }
 }

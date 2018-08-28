@@ -76,4 +76,14 @@ public abstract class LockableCollectionProperty<T, C extends Collection<T>> ext
         super.lockNow();
         delegate = null;
     }
+
+    @Override
+    public Class<? extends T> getElementType() {
+        return delegate.getElementType();
+    }
+
+    @Override
+    public int size() {
+        return delegate.size();
+    }
 }
