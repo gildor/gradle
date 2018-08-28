@@ -43,7 +43,7 @@ class PrettyCalculator {
     }
 
     static int percentage(double p) {
-        return (int) p * 100
+        return (int) (p * 100)
     }
 
     static String percentageString(int percentage) {

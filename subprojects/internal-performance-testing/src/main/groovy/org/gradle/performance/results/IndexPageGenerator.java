@@ -80,8 +80,11 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
             private void renderSummary(TreeSet<PerformanceTestScenario> results) {
                 long successCount = scenarioBuildResultData.values().stream().filter(ScenarioBuildResultData::isSuccessful).count();
                 long otherCount = results.size() - successCount;
-                h2().text("" + otherCount + " failed scenarios").end();
-                h2().text("" + successCount + " successful scenarios").end();
+                h3().text("" + successCount + " successful scenarios");
+                if (otherCount > 0) {
+                    text(", " + otherCount + " failed scenarios");
+                }
+                end();
             }
 
             private void renderScenario(PerformanceTestScenario scenario) {
@@ -103,7 +106,7 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
 
             private void renderActiveScenario(PerformanceTestScenario scenario) {
                 h2().classAttr("test-execution");
-                    a().href(scenario.buildResultData.getWebUrl()).text(getTestDescription(scenario) + scenario).end();
+                    a().href(scenario.getWebUrl()).text(getTestDescription(scenario) + scenario.name).end();
                 end();
                 table().classAttr("history");
                 tr().classAttr("control-groups");
@@ -134,21 +137,23 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
         Comparator<PerformanceTestScenario> comparator = Comparator
             .comparing(PerformanceTestScenario::isArchived)
             .thenComparing(PerformanceTestScenario::isSuccessful)
-            .thenComparing(PerformanceTestScenario::getRegressionPercentage);
+            .thenComparing(PerformanceTestScenario::getRegressionPercentage)
+            .thenComparing(PerformanceTestScenario::getName);
 
         return store.getTestNames().stream().map(scenarioName -> {
             PerformanceTestHistory testHistory = store.getTestResults(scenarioName, 5, 14, ResultsStoreHelper.determineChannel());
-
-            return new PerformanceTestScenario(testHistory, scenarioBuildResultData.get(scenarioName));
+            return new PerformanceTestScenario(scenarioName, testHistory, scenarioBuildResultData.get(scenarioName));
         }).collect(() -> new TreeSet<>(comparator), TreeSet::add, TreeSet::addAll);
     }
 
     private class PerformanceTestScenario {
+        private String name;
         private PerformanceTestHistory history;
         private List<ExperimentData> experiments;
         private ScenarioBuildResultData buildResultData;
 
-        private PerformanceTestScenario(PerformanceTestHistory history, ScenarioBuildResultData buildResultData) {
+        private PerformanceTestScenario(String name, PerformanceTestHistory history, ScenarioBuildResultData buildResultData) {
+            this.name = name;
             this.history = history;
             experiments = filterForRequestedCommit(history.getExecutions())
                 .stream()
@@ -158,7 +163,11 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
         }
 
         private boolean isSuccessful() {
-            return scenarioBuildResultData == null || buildResultData.isSuccessful();
+            return buildResultData == null || buildResultData.isSuccessful();
+        }
+
+        private String getWebUrl() {
+            return buildResultData == null ? "" : buildResultData.getWebUrl();
         }
 
         private boolean isArchived() {
@@ -167,6 +176,10 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
 
         private int getRegressionPercentage() {
             return experiments.isEmpty() ? 0 : experiments.get(0).regressionPercentage;
+        }
+
+        private String getName() {
+            return name;
         }
     }
 }

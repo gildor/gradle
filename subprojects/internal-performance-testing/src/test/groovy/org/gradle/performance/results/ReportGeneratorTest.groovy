@@ -28,6 +28,11 @@ class ReportGeneratorTest extends ResultSpecification {
     final ReportGenerator generator = new ReportGenerator()
     final dbFile = tmpDir.file("results")
     final reportDir = tmpDir.file("report")
+    final resultsJson = tmpDir.file('results.json')
+
+    def setup() {
+        resultsJson << '[]'
+    }
 
     def "generates report"() {
         setup:
@@ -38,7 +43,7 @@ class ReportGeneratorTest extends ResultSpecification {
         store.report(result2)
 
         when:
-        generator.generate(store, reportDir)
+        generator.generate(store, reportDir, resultsJson)
 
         then:
         reportDir.file("index.html").isFile()
@@ -90,7 +95,7 @@ class ReportGeneratorTest extends ResultSpecification {
         store.report(resultNew)
 
         when:
-        generator.generate(store, reportDir)
+        generator.generate(store, reportDir, resultsJson)
 
         then:
         !reportDir.file("index.html").text.contains('Test: Old Test')

@@ -221,6 +221,7 @@ public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
         protected Boolean slower;
 
         protected ExperimentData(PerformanceTestExecution execution, List<DataSeries<Duration>> experimentData, Amount<Duration> experimentWithMaxMedian, Amount<Duration> experimentWithMinMedian) {
+            this.execution = execution;
             this.experimentData = experimentData;
             this.experimentWithMaxMedian = experimentWithMaxMedian;
             this.experimentWithMinMedian = experimentWithMinMedian;

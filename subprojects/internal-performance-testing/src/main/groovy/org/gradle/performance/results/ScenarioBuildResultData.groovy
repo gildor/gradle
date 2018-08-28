@@ -18,7 +18,6 @@ package org.gradle.performance.results
 
 class ScenarioBuildResultData {
     String name
-    String buildTypeId
     String webUrl
     boolean successful
 }
