@@ -18,6 +18,7 @@ package org.gradle.performance.results;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.annotations.VisibleForTesting;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,6 +31,8 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static java.util.Comparator.comparing;
+import static java.util.Comparator.comparingInt;
 import static java.util.stream.Collectors.toMap;
 
 public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
@@ -133,32 +136,36 @@ public class IndexPageGenerator extends HtmlPageGenerator<ResultsStore> {
         };
     }
 
-    private TreeSet<PerformanceTestScenario> sortTestResults(ResultsStore store) {
-        Comparator<PerformanceTestScenario> comparator = Comparator
-            .comparing(PerformanceTestScenario::isArchived)
+    @VisibleForTesting
+    TreeSet<PerformanceTestScenario> sortTestResults(ResultsStore store) {
+        Comparator<PerformanceTestScenario> comparator = comparing(PerformanceTestScenario::isArchived)
             .thenComparing(PerformanceTestScenario::isSuccessful)
-            .thenComparing(PerformanceTestScenario::getRegressionPercentage)
+            .thenComparing(comparingInt(PerformanceTestScenario::getRegressionPercentage).reversed())
             .thenComparing(PerformanceTestScenario::getName);
 
         return store.getTestNames().stream().map(scenarioName -> {
-            PerformanceTestHistory testHistory = store.getTestResults(scenarioName, 5, 14, ResultsStoreHelper.determineChannel());
-            return new PerformanceTestScenario(scenarioName, testHistory, scenarioBuildResultData.get(scenarioName));
+            PerformanceTestHistory history = store.getTestResults(scenarioName, 5, 14, ResultsStoreHelper.determineChannel());
+            return new PerformanceTestScenario(scenarioName, history, scenarioBuildResultData.get(scenarioName));
         }).collect(() -> new TreeSet<>(comparator), TreeSet::add, TreeSet::addAll);
     }
 
-    private class PerformanceTestScenario {
-        private String name;
-        private PerformanceTestHistory history;
-        private List<ExperimentData> experiments;
-        private ScenarioBuildResultData buildResultData;
+    private List<ExperimentData> extractExperiementsData(PerformanceTestHistory history) {
+        return filterForRequestedCommit(history.getExecutions())
+            .stream()
+            .map(execution -> extractExperimentData(execution, MeasuredOperationList::getTotalTime))
+            .collect(Collectors.toList());
+    }
 
-        private PerformanceTestScenario(String name, PerformanceTestHistory history, ScenarioBuildResultData buildResultData) {
+    private class PerformanceTestScenario {
+        String name;
+        PerformanceTestHistory history;
+        List<ExperimentData> experiments;
+        ScenarioBuildResultData buildResultData;
+
+        PerformanceTestScenario(String name, PerformanceTestHistory history, ScenarioBuildResultData buildResultData) {
             this.name = name;
             this.history = history;
-            experiments = filterForRequestedCommit(history.getExecutions())
-                .stream()
-                .map(execution -> extractExperimentData(execution, MeasuredOperationList::getTotalTime))
-                .collect(Collectors.toList());
+            this.experiments = extractExperiementsData(history);
             this.buildResultData = buildResultData;
         }
 

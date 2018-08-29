@@ -218,7 +218,6 @@ public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
         protected Amount<Duration> experimentWithMinMedian;
         protected Integer regressionPercentage;
         protected Integer confidencePercentage;
-        protected Boolean slower;
 
         protected ExperimentData(PerformanceTestExecution execution, List<DataSeries<Duration>> experimentData, Amount<Duration> experimentWithMaxMedian, Amount<Duration> experimentWithMinMedian) {
             this.execution = execution;
@@ -237,12 +236,7 @@ public abstract class HtmlPageGenerator<T> extends ReportRenderer<T, Writer> {
             if(experimentalGroup.isPresent() && controlGroup.isPresent()) {
                 regressionPercentage = percentChange(experimentalGroup.get().getAverage(), controlGroup.get().getAverage()).intValue();
                 confidencePercentage = percentage(confidenceInDifference(experimentalGroup.get(), controlGroup.get()));
-                slower = experimentalGroup.get().significantlyGreaterThan(controlGroup.get());
             }
-        }
-
-        protected boolean isSlower() {
-            return Boolean.FALSE.equals(slower);
         }
     }
 
